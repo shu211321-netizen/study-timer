@@ -908,6 +908,11 @@
 
         function startTimer() {
             if (!isRunning) {
+                if (displaySeconds <= 0) {
+                    showNotification('⚠️ 시간 설정 필요', '먼저 시간을 설정해주세요!');
+                    return;
+                }
+                
                 isRunning = true;
                 timerDisplay.classList.add('active');
                 lastTickTime = Date.now();
@@ -918,9 +923,22 @@
                     const elapsed = Math.floor((now - lastTickTime) / 1000);
                     
                     if (elapsed >= 1) {
-                        displaySeconds += elapsed;
-                        actualStudiedSeconds += elapsed;
+                        displaySeconds -= elapsed; // 카운트다운: 시간 감소
+                        actualStudiedSeconds += elapsed; // 실제 공부 시간은 증가
                         lastTickTime = now;
+                        
+                        // 시간이 0이 되면 종료
+                        if (displaySeconds <= 0) {
+                            displaySeconds = 0;
+                            pauseTimer();
+                            showNotification('🎉 완료!', '목표 시간을 달성했습니다!');
+                            // 자동으로 세션 저장
+                            const sessionTime = sessionStartSeconds;
+                            if (sessionTime > 0) {
+                                saveStudySession(sessionTime);
+                            }
+                            sessionStartSeconds = 0;
+                        }
                         
                         checkAndAwardPoint();
                         
@@ -943,7 +961,7 @@
         }
 
         function resetTimer() {
-            const sessionStudyTime = isRunning ? (displaySeconds - sessionStartSeconds) : 0;
+            const sessionStudyTime = sessionStartSeconds - displaySeconds; // 카운트다운이므로 시작시간 - 현재시간 = 공부한 시간
             
             pauseTimer();
             
@@ -994,12 +1012,12 @@
         document.querySelectorAll('.preset-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const addedSeconds = parseInt(btn.dataset.minutes) * 60;
-                displaySeconds += addedSeconds;
+                displaySeconds = addedSeconds; // 카운트다운이므로 덮어쓰기 (추가 아님)
                 
                 updateDisplay();
                 saveTimerState();
                 
-                showNotification('⏱️ 시간 설정', `${btn.dataset.minutes}분이 추가되었습니다`);
+                showNotification('⏱️ 타이머 설정', `${btn.dataset.minutes}분 타이머가 설정되었습니다`);
             });
         });
 
@@ -1026,8 +1044,8 @@
             thisWeekStart.setDate(thisWeekStart.getDate() - thisWeekStart.getDay());
             
             let currentSessionTime = 0;
-            if (isRunning) {
-                currentSessionTime = displaySeconds - sessionStartSeconds;
+            if (isRunning && sessionStartSeconds > 0) {
+                currentSessionTime = sessionStartSeconds - displaySeconds; // 카운트다운이므로 시작-현재 = 공부한 시간
             }
             
             const todaySessions = sessions.filter(s => s.date === today);
